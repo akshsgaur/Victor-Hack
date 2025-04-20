@@ -460,8 +460,8 @@
         <p id="loading-detail">Your AI agents are working together</p>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script> -->
+    <!-- <script>
         // DOM Elements
         const micBtn = document.getElementById('mic-btn');
         const submitBtn = document.getElementById('submit-btn');
@@ -535,6 +535,30 @@
             downloadBtn.addEventListener('click', downloadCode);
             enhanceBtn.addEventListener('click', enhanceCode);
         }
+
+        function sendAudioToServer(audioBlob) {
+        const formData = new FormData();
+        formData.append('audio', audioBlob);
+
+        fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[Whisper] Transcription response:', data); // ✅ Add this
+            if (data.success && data.text) {
+                transcript.value = data.text;
+                processTextRequest(data.text);
+            } else {
+                updateStatus('Error: ' + (data.error || 'Could not transcribe audio'), 'error');
+            }
+        })
+    .catch(error => {
+        console.error('Error sending audio:', error);
+        updateStatus('Error processing audio', 'error');
+    });
+}
         
         // Set up tab navigation
         function setupTabNavigation() {
@@ -581,7 +605,46 @@
         }
         
         // Set up media recorder for speech recognition
+        
+//         function setupMediaRecorder() {
+//     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+//         console.error('getUserMedia is not supported in this browser or context');
+//         updateStatus('Browser does not support audio recording', 'error');
+//         return;
+//     }
+
+//     navigator.mediaDevices.getUserMedia({ audio: true })
+//         .then(stream => {
+//             mediaRecorder = new MediaRecorder(stream);
+//             mediaRecorder.onstart = () => {
+//                         audioChunks = [];
+//                     };
+                    
+//                     mediaRecorder.ondataavailable = (event) => {
+//                         audioChunks.push(event.data);
+//                     };
+                    
+//                     mediaRecorder.onstop = () => {
+//                         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+//                         sendAudioToServer(audioBlob);
+//                     };
+                    
+//                     // Start recording immediately
+//                     startRecording();
+//         })
+//         .catch(error => {
+//             console.error('Error accessing microphone:', error);
+//             updateStatus('Microphone access denied', 'error');
+//         });
+// }
+
+
+        
         function setupMediaRecorder() {
+
+            
+
+
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
                     mediaRecorder = new MediaRecorder(stream);
@@ -971,75 +1034,68 @@
         // Web Speech API fallback
         // This is an alternative to the MediaRecorder API for speech recognition
         function setupWebSpeechRecognition() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                return false;
-            }
-            
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            
-            recognition.continuous = false;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-            
-            recognition.onstart = function() {
-                isRecording = true;
-                micBtn.classList.add('recording');
-                updateStatus('Listening...', 'listening');
-            };
-            
-            recognition.onresult = function(event) {
-                let interimTranscript = '';
-                let finalTranscript = '';
-                
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
-                }
-                
-                if (finalTranscript) {
-                    transcript.value = finalTranscript;
-                } else {
-                    transcript.value = interimTranscript;
-                }
-            };
-            
-            recognition.onend = function() {
-                isRecording = false;
-                micBtn.classList.remove('recording');
-                
-                // If we have a transcript, process it
-                if (transcript.value.trim()) {
-                    updateStatus('Processing...', 'processing');
-                    processTextRequest(transcript.value);
-                } else {
-                    updateStatus('No speech detected', 'error');
-                }
-            };
-            
-            recognition.onerror = function(event) {
-                isRecording = false;
-                micBtn.classList.remove('recording');
-                console.error('Speech recognition error', event);
-                updateStatus('Error: ' + event.error, 'error');
-            };
-            
-            // Replace the existing mic button handler
-            micBtn.removeEventListener('click', toggleRecording);
-            micBtn.addEventListener('click', function() {
-                if (isRecording) {
-                    recognition.stop();
-                } else {
-                    transcript.value = '';
-                    recognition.start();
-                }
-            });
-            
-            return true;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        console.warn('Web Speech API not supported.');
+        updateStatus('Speech recognition not available in this browser', 'error');
+        return false;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+        isRecording = true;
+        micBtn.classList.add('recording');
+        updateStatus('Listening...', 'listening');
+        console.log('[Speech] Started');
+    };
+
+    recognition.onresult = (event) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            finalTranscript += event.results[i][0].transcript;
         }
+
+        transcript.value = finalTranscript.trim();
+        console.log('[Speech] Final Transcript:', finalTranscript);
+    };
+
+    recognition.onend = () => {
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        console.log('[Speech] Ended');
+
+        if (transcript.value.trim()) {
+            updateStatus('Processing...', 'processing');
+            processTextRequest(transcript.value.trim());
+        } else {
+            updateStatus('No speech detected', 'error');
+        }
+    };
+
+    recognition.onerror = (event) => {
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        console.error('[Speech] Error:', event.error);
+        updateStatus('Error: ' + event.error, 'error');
+    };
+
+    // Only wire up once to avoid double triggering
+    micBtn.onclick = () => {
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            transcript.value = '';
+            recognition.start();
+        }
+    };
+
+    return true;
+}
         
         // Try Web Speech API if MediaRecorder fails
         function fallbackToWebSpeech() {
@@ -1076,6 +1132,7 @@
         
         // Call this function instead of just setupMediaRecorder
         initSpeechRecognition();
-    </script>
+    </script> -->
+    <script src="/templates/script.js"></script>
 </body>
 </html>

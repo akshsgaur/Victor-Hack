@@ -348,7 +348,7 @@ class CodeExecutorAgent:
         self.installed_packages = self._get_installed_packages()
         return output
     
-    def execute(self, code: str, timeout: int = 30) -> Tuple[bool, str]:
+    def execute(self, code: str, timeout: int = 6000) -> Tuple[bool, str]:
         """Execute code and return result"""
         logger.info("Executing code")
         
@@ -733,6 +733,43 @@ def enhance_code_api():
         logger.exception("Error enhancing code")
         return jsonify({'error': str(e)}), 500
 
+
+
+# @app.route('/api/transcribe', methods=['POST'])
+# def transcribe_api():
+#     """Transcribe audio to text using OpenAI Whisper API"""
+#     if 'audio' not in request.files:
+#         return jsonify({'success': False, 'error': 'No audio file provided'}), 400
+
+#     audio_file = request.files['audio']
+
+#     # Save audio temporarily
+#     temp_audio_path = tempfile.mktemp(suffix=".webm")
+#     audio_file.save(temp_audio_path)
+
+#     try:
+#         with open(temp_audio_path, "rb") as audio:
+#             transcription = client.audio.transcriptions.create(
+#                 file=audio,
+#                 model="whisper-1",
+#                 response_format="text"
+#             )
+
+#         # Clean up
+#         os.remove(temp_audio_path)
+
+#         logger.info(f"Transcription successful: {transcription}")
+#         return jsonify({'success': True, 'text': transcription})
+
+#     except Exception as e:
+#         if os.path.exists(temp_audio_path):
+#             os.remove(temp_audio_path)
+#         logger.exception("Error during transcription")
+#         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_api():
     """Transcribe audio to text"""
@@ -880,8 +917,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.web:
-        print("Starting web interface on http://localhost:5000")
-        app.run(debug=True, host='0.0.0.0', port=8080) # Changed to 0.0.0.0
+        print("Starting web interface on https://localhost:5000")
+        app.run(debug=True, host='0.0.0.0', port=3010, ssl_context=("./cert.pem", "./key.pem")) # Changed to 0.0.0.0
     elif args.cli:
         cli_interface()
     else:

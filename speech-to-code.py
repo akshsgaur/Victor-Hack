@@ -48,7 +48,7 @@ app = Flask(__name__)
 class CodeGeneratorAgent:
     """Agent responsible for generating code based on natural language descriptions"""
     
-    def __init__(self, model="gpt-4-turbo-preview"):
+    def __init__(self, model="gpt-4.1-nano"):
         self.model = model
         logger.info(f"Initialized CodeGeneratorAgent with model: {model}")
     
@@ -117,7 +117,7 @@ Return ONLY the full Python code with no additional explanations."""
 class CodeDebuggerAgent:
     """Agent responsible for debugging and fixing code"""
     
-    def __init__(self, model="gpt-4-turbo-preview"):
+    def __init__(self, model="gpt-4.1-nano"):
         self.model = model
         logger.info(f"Initialized CodeDebuggerAgent with model: {model}")
     
@@ -507,7 +507,7 @@ Provide a clear, concise explanation with a focus on helping someone understand 
 class CodeEnhancerAgent:
     """Agent responsible for enhancing code based on user feedback"""
     
-    def __init__(self, model="gpt-4-turbo-preview"):
+    def __init__(self, model="gpt-4.1-nano"):
         self.model = model
         logger.info(f"Initialized CodeEnhancerAgent with model: {model}")
     
@@ -772,34 +772,103 @@ def enhance_code_api():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_api():
-    """Transcribe audio to text"""
+    """Transcribe audio to text using OpenAI Whisper API"""
     if 'audio' not in request.files:
-        return jsonify({'error': 'No audio file provided'}), 400
-    
+        logger.error("No audio file provided in request")
+        return jsonify({'success': False, 'error': 'No audio file provided'}), 400
+
     audio_file = request.files['audio']
+    logger.info(f"Received audio file: {audio_file.filename}, Content type: {audio_file.content_type}")
+
+    # Save audio temporarily with appropriate extension based on content type
+    content_type = audio_file.content_type
+    extension = ".wav"  # Default extension
     
-    # Save audio file temporarily
-    temp_audio_path = "temp_audio.wav"
-    audio_file.save(temp_audio_path)
+    if "webm" in content_type:
+        extension = ".webm"
+    elif "mp3" in content_type:
+        extension = ".mp3"
+    elif "ogg" in content_type:
+        extension = ".ogg"
+    
+    temp_audio_path = tempfile.mktemp(suffix=extension)
+    logger.info(f"Saving audio to temporary file: {temp_audio_path}")
     
     try:
-        orchestrator = SpeechToCodeOrchestrator()
-        text = orchestrator.transcribe_audio(temp_audio_path)
+        audio_file.save(temp_audio_path)
+        logger.info(f"Audio file saved, size: {os.path.getsize(temp_audio_path)} bytes")
         
-        # Clean up temporary file
-        os.remove(temp_audio_path)
+        # First try to use OpenAI Whisper API if available
+        if USE_NEW_OPENAI:
+            try:
+                logger.info("Attempting transcription with OpenAI Whisper API")
+                with open(temp_audio_path, "rb") as audio:
+                    transcription = client.audio.transcriptions.create(
+                        file=audio,
+                        model="whisper-1"
+                    )
+                
+                text = transcription.text
+                logger.info(f"OpenAI Whisper transcription successful: {text}")
+                
+                # Clean up
+                os.remove(temp_audio_path)
+                return jsonify({'success': True, 'text': text})
+            
+            except Exception as e:
+                logger.error(f"OpenAI Whisper transcription failed: {str(e)}")
+                # Fall through to try other methods
         
-        if text:
-            return jsonify({'success': True, 'text': text})
-        else:
-            return jsonify({'error': 'Could not transcribe audio'}), 500
+        # If OpenAI transcription failed or not available, try speech_recognition
+        if SPEECH_RECOGNITION_AVAILABLE:
+            try:
+                logger.info("Attempting transcription with speech_recognition")
+                recognizer = sr.Recognizer()
+                
+                # Handle different audio formats
+                if extension == ".webm":
+                    # Convert webm to wav using ffmpeg if available
+                    try:
+                        wav_path = tempfile.mktemp(suffix=".wav")
+                        subprocess.run(
+                            ["ffmpeg", "-i", temp_audio_path, wav_path],
+                            check=True,
+                            capture_output=True
+                        )
+                        temp_audio_path = wav_path
+                        logger.info(f"Converted webm to wav: {wav_path}")
+                    except Exception as conv_error:
+                        logger.error(f"Error converting webm to wav: {str(conv_error)}")
+                        # Continue with original file if conversion fails
+                
+                with sr.AudioFile(temp_audio_path) as source:
+                    audio_data = recognizer.record(source)
+                    text = recognizer.recognize_google(audio_data)
+                    logger.info(f"Speech recognition transcription successful: {text}")
+                    
+                    # Clean up
+                    os.remove(temp_audio_path)
+                    return jsonify({'success': True, 'text': text})
+            
+            except Exception as sr_error:
+                logger.error(f"Speech recognition transcription failed: {str(sr_error)}")
+                # Fall through to return error
+        
+        # If we got here, both methods failed
+        logger.error("All transcription methods failed")
+        return jsonify({
+            'success': False, 
+            'error': 'Transcription failed. Speech recognition is not properly configured.'
+        }), 500
+    
     except Exception as e:
+        logger.exception("Error processing audio file")
+        
         # Clean up temporary file
         if os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
         
-        logger.exception("Error transcribing audio")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/execute-code', methods=['POST'])
 def execute_code_api():

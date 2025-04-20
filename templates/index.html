@@ -460,679 +460,669 @@
         <p id="loading-detail">Your AI agents are working together</p>
     </div>
     
-    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script> -->
-    <!-- <script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
         // DOM Elements
-        const micBtn = document.getElementById('mic-btn');
-        const submitBtn = document.getElementById('submit-btn');
-        const textInput = document.getElementById('text-input');
-        const transcript = document.getElementById('transcript');
-        const codeContainer = document.getElementById('code-container');
-        const consoleOutput = document.getElementById('console-output');
-        const explanationContainer = document.getElementById('explanation-container');
-        const runBtn = document.getElementById('run-btn');
-        const debugBtn = document.getElementById('debug-btn');
-        const explainBtn = document.getElementById('explain-btn');
-        const downloadBtn = document.getElementById('download-btn');
-        const enhanceBtn = document.getElementById('enhance-btn');
-        const feedbackInput = document.getElementById('feedback-input');
-        const statusIndicator = document.getElementById('status-indicator');
-        const statusText = document.getElementById('status-text');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const loadingText = document.getElementById('loading-text');
-        const loadingDetail = document.getElementById('loading-detail');
-        const exampleCommands = document.querySelectorAll('.example-command');
-        const generatorIcon = document.getElementById('generator-icon');
-        const debuggerIcon = document.getElementById('debugger-icon');
-        const executorIcon = document.getElementById('executor-icon');
-        
-        // State
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-        let currentFilename = null;
-        
-        // Initialize
-        function init() {
-            setupEventListeners();
-            setupTabNavigation();
-            checkSpeechSupport();
-        }
-        
-        // Set up event listeners
-        function setupEventListeners() {
-            // Mic button
-            micBtn.addEventListener('click', toggleRecording);
-            
-            // Submit text button
-            submitBtn.addEventListener('click', () => {
-                const text = textInput.value.trim();
-                if (text) {
-                    processTextRequest(text);
-                    textInput.value = '';
-                }
-            });
-            
-            // Text input on enter key
-            textInput.addEventListener('keyup', (event) => {
-                if (event.key === 'Enter') {
-                    submitBtn.click();
-                }
-            });
-            
-            // Example commands
-            exampleCommands.forEach(cmd => {
-                cmd.addEventListener('click', () => {
-                    textInput.value = cmd.textContent;
-                    submitBtn.click();
-                });
-            });
-            
-            // Action buttons
-            runBtn.addEventListener('click', runCode);
-            debugBtn.addEventListener('click', debugCode);
-            explainBtn.addEventListener('click', explainCode);
-            downloadBtn.addEventListener('click', downloadCode);
-            enhanceBtn.addEventListener('click', enhanceCode);
-        }
+const micBtn = document.getElementById('mic-btn');
+const submitBtn = document.getElementById('submit-btn');
+const textInput = document.getElementById('text-input');
+const transcript = document.getElementById('transcript');
+const codeContainer = document.getElementById('code-container');
+const consoleOutput = document.getElementById('console-output');
+const explanationContainer = document.getElementById('explanation-container');
+const runBtn = document.getElementById('run-btn');
+const debugBtn = document.getElementById('debug-btn');
+const explainBtn = document.getElementById('explain-btn');
+const downloadBtn = document.getElementById('download-btn');
+const enhanceBtn = document.getElementById('enhance-btn');
+const feedbackInput = document.getElementById('feedback-input');
+const statusIndicator = document.getElementById('status-indicator');
+const statusText = document.getElementById('status-text');
+const loadingOverlay = document.getElementById('loading-overlay');
+const loadingText = document.getElementById('loading-text');
+const loadingDetail = document.getElementById('loading-detail');
+const exampleCommands = document.querySelectorAll('.example-command');
+const generatorIcon = document.getElementById('generator-icon');
+const debuggerIcon = document.getElementById('debugger-icon');
+const executorIcon = document.getElementById('executor-icon');
 
-        function sendAudioToServer(audioBlob) {
-        const formData = new FormData();
-        formData.append('audio', audioBlob);
+// State
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let currentFilename = null;
+let recognitionInstance = null;
 
-        fetch('/api/transcribe', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('[Whisper] Transcription response:', data); // ✅ Add this
-            if (data.success && data.text) {
-                transcript.value = data.text;
-                processTextRequest(data.text);
-            } else {
-                updateStatus('Error: ' + (data.error || 'Could not transcribe audio'), 'error');
+// Initialize
+function init() {
+    setupEventListeners();
+    setupTabNavigation();
+    checkSpeechSupport();
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    // Mic button (don't set click handler here - we'll set it based on which API we use)
+    
+    // Submit text button
+    submitBtn.addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (text) {
+            processTextRequest(text);
+            textInput.value = '';
+        }
+    });
+    
+    // Text input on enter key
+    textInput.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') {
+            submitBtn.click();
+        }
+    });
+    
+    // Example commands
+    exampleCommands.forEach(cmd => {
+        cmd.addEventListener('click', () => {
+            textInput.value = cmd.textContent;
+            submitBtn.click();
+        });
+    });
+    
+    // Action buttons
+    runBtn.addEventListener('click', runCode);
+    debugBtn.addEventListener('click', debugCode);
+    explainBtn.addEventListener('click', explainCode);
+    downloadBtn.addEventListener('click', downloadCode);
+    enhanceBtn.addEventListener('click', enhanceCode);
+}
+
+// Set up tab navigation
+function setupTabNavigation() {
+    const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            
+            // Hide all tab panes
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Remove active class from all tab buttons
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            
+            // Add active class to clicked button
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+            
+            // Show the corresponding tab pane
+            const targetPaneId = this.getAttribute('data-bs-target');
+            const targetPane = document.querySelector(targetPaneId);
+            if (targetPane) {
+                targetPane.classList.add('show', 'active');
             }
-        })
-    .catch(error => {
-        console.error('Error sending audio:', error);
-        updateStatus('Error processing audio', 'error');
+        });
     });
 }
-        
-        // Set up tab navigation
-        function setupTabNavigation() {
-            const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
-            
-            tabButtons.forEach(button => {
-                button.addEventListener('click', function(event) {
-                    event.preventDefault();
-                    
-                    // Hide all tab panes
-                    document.querySelectorAll('.tab-pane').forEach(pane => {
-                        pane.classList.remove('show', 'active');
-                    });
-                    
-                    // Remove active class from all tab buttons
-                    tabButtons.forEach(btn => {
-                        btn.classList.remove('active');
-                        btn.setAttribute('aria-selected', 'false');
-                    });
-                    
-                    // Add active class to clicked button
-                    this.classList.add('active');
-                    this.setAttribute('aria-selected', 'true');
-                    
-                    // Show the corresponding tab pane
-                    const targetPaneId = this.getAttribute('data-bs-target');
-                    const targetPane = document.querySelector(targetPaneId);
-                    if (targetPane) {
-                        targetPane.classList.add('show', 'active');
-                    }
-                });
-            });
-        }
-        
-        // Check if speech recognition is supported
-        function checkSpeechSupport() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                micBtn.disabled = true;
-                micBtn.style.backgroundColor = '#ccc';
-                micBtn.style.cursor = 'not-allowed';
-                micBtn.title = 'Speech recognition not supported in this browser';
-                updateStatus('Speech recognition not available in this browser', 'error');
-            }
-        }
-        
-        // Set up media recorder for speech recognition
-        
-//         function setupMediaRecorder() {
-//     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-//         console.error('getUserMedia is not supported in this browser or context');
-//         updateStatus('Browser does not support audio recording', 'error');
-//         return;
-//     }
 
-//     navigator.mediaDevices.getUserMedia({ audio: true })
-//         .then(stream => {
-//             mediaRecorder = new MediaRecorder(stream);
-//             mediaRecorder.onstart = () => {
-//                         audioChunks = [];
-//                     };
-                    
-//                     mediaRecorder.ondataavailable = (event) => {
-//                         audioChunks.push(event.data);
-//                     };
-                    
-//                     mediaRecorder.onstop = () => {
-//                         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-//                         sendAudioToServer(audioBlob);
-//                     };
-                    
-//                     // Start recording immediately
-//                     startRecording();
-//         })
-//         .catch(error => {
-//             console.error('Error accessing microphone:', error);
-//             updateStatus('Microphone access denied', 'error');
-//         });
-// }
+// Check if speech recognition is supported
+function checkSpeechSupport() {
+    // Try to initialize speech recognition
+    initSpeechRecognition();
+}
 
+// Unified toggle recording function
+function toggleRecording() {
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
 
-        
-        function setupMediaRecorder() {
-
-            
-
-
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    
-                    mediaRecorder.onstart = () => {
-                        audioChunks = [];
-                    };
-                    
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-                    
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        sendAudioToServer(audioBlob);
-                    };
-                    
-                    // Start recording immediately
-                    startRecording();
-                })
-                .catch(error => {
-                    console.error('Error accessing microphone:', error);
-                    updateStatus('Microphone access denied', 'error');
-                });
-        }
-        
-        // Toggle recording
-        function toggleRecording() {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                if (!mediaRecorder) {
-                    setupMediaRecorder();
-                } else {
-                    startRecording();
-                }
-            }
-        }
-        
-        // Start recording
-        function startRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'inactive') {
-                mediaRecorder.start();
-                isRecording = true;
-                micBtn.classList.add('recording');
-                updateStatus('Listening...', 'listening');
-            }
-        }
-        
-        // Stop recording
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                isRecording = false;
-                micBtn.classList.remove('recording');
-                updateStatus('Processing audio...', 'processing');
-            }
-        }
-        
-        // Send audio to server for transcription
-        function sendAudioToServer(audioBlob) {
-            const formData = new FormData();
-            formData.append('audio', audioBlob);
-            
-            fetch('/api/transcribe', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.text) {
-                    transcript.value = data.text;
-                    processTextRequest(data.text);
-                } else {
-                    updateStatus('Error: ' + (data.error || 'Could not transcribe audio'), 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error sending audio:', error);
-                updateStatus('Error processing audio', 'error');
-            });
-        }
-        
-        // Process text request
-        function processTextRequest(text) {
-            showLoading('Generating Code', 'The Generator Agent is creating your code...');
-            activateAgent('generator');
-            
-            // Send text to server
-            fetch('/api/process-text', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ text })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success !== false) {
-                    // Update UI with generated code
-                    codeContainer.textContent = data.code;
-                    consoleOutput.textContent = data.output || '# No output yet';
-                    explanationContainer.textContent = data.explanation || '# No explanation yet';
-                    
-                    // Store the filename for download
-                    currentFilename = data.filename;
-                    
-                    // Enable action buttons
-                    runBtn.classList.remove('disabled');
-                    debugBtn.classList.remove('disabled');
-                    explainBtn.classList.remove('disabled');
-                    downloadBtn.classList.remove('disabled');
-                    
-                    // Update status
-                    updateStatus('Code generated successfully', 'success');
-                } else {
-                    updateStatus('Error: ' + (data.error || 'Could not generate code'), 'error');
-                }
-                
-                hideLoading();
-                resetAgents();
-            })
-            .catch(error => {
-                console.error('Error processing text:', error);
-                updateStatus('Error communicating with server', 'error');
-                hideLoading();
-                resetAgents();
-            });
-        }
-        
-        // Run code
-        function runCode() {
-            if (!codeContainer.textContent.trim()) return;
-            
-            showLoading('Running Code', 'The Executor Agent is running your code...');
-            activateAgent('executor');
-            
-            // Get current code from the code container
-            const code = codeContainer.textContent;
-            
-            fetch('/api/execute-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ code })
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Switch to output tab
-                document.getElementById('output-tab').click();
-                
-                if (data.success) {
-                    consoleOutput.textContent = data.output || '# No output';
-                    updateStatus('Code executed successfully', 'success');
-                } else {
-                    consoleOutput.textContent = data.error || 'Error executing code';
-                    updateStatus('Execution failed', 'error');
-                }
-                
-                hideLoading();
-                resetAgents();
-            })
-            .catch(error => {
-                console.error('Error running code:', error);
-                consoleOutput.textContent = 'Error: ' + error.message;
-                updateStatus('Error communicating with server', 'error');
-                hideLoading();
-                resetAgents();
-            });
-        }
-        
-        // Debug code
-        function debugCode() {
-            if (!codeContainer.textContent.trim()) return;
-            
-            showLoading('Debugging Code', 'The Debugger Agent is fixing your code...');
-            activateAgent('debugger');
-            
-            // Get current code from the code container
-            const code = codeContainer.textContent;
-            const error = consoleOutput.textContent;
-            
-            fetch('/api/enhance-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    code,
-                    feedback: 'Fix any bugs or errors in this code. ' + error
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success !== false) {
-                    // Update UI with debugged code
-                    codeContainer.textContent = data.code;
-                    consoleOutput.textContent = data.output || '# No output yet';
-                    explanationContainer.textContent = data.explanation || '# No explanation yet';
-                    
-                    // Store the filename for download
-                    currentFilename = data.filename;
-                    
-                    // Update status
-                    updateStatus('Code debugged successfully', 'success');
-                } else {
-                    updateStatus('Error: ' + (data.error || 'Could not debug code'), 'error');
-                }
-                
-                hideLoading();
-                resetAgents();
-            })
-            .catch(error => {
-                console.error('Error debugging code:', error);
-                updateStatus('Error communicating with server', 'error');
-                hideLoading();
-                resetAgents();
-            });
-        }
-        
-        // Explain code
-        function explainCode() {
-            if (!codeContainer.textContent.trim()) return;
-            
-            showLoading('Explaining Code', 'Generating a detailed explanation...');
-            
-            // Get current code from the code container
-            const code = codeContainer.textContent;
-            
-            fetch('/api/explain-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ code })
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Switch to explanation tab
-                document.getElementById('explanation-tab').click();
-                
-                if (data.success) {
-                    explanationContainer.textContent = data.explanation;
-                    updateStatus('Explanation generated', 'success');
-                } else {
-                    explanationContainer.textContent = 'Error: ' + (data.error || 'Could not explain code');
-                    updateStatus('Error generating explanation', 'error');
-                }
-                
-                hideLoading();
-            })
-            .catch(error => {
-                console.error('Error explaining code:', error);
-                explanationContainer.textContent = 'Error: ' + error.message;
-                updateStatus('Error communicating with server', 'error');
-                hideLoading();
-            });
-        }
-        
-        // Download code
-        function downloadCode() {
-            if (!currentFilename) return;
-            
-            window.location.href = '/download/' + currentFilename;
-        }
-        
-        // Enhance code based on feedback
-        function enhanceCode() {
-            const feedback = feedbackInput.value.trim();
-            if (!feedback || !codeContainer.textContent.trim()) return;
-            
-            showLoading('Enhancing Code', 'Implementing your requested changes...');
-            activateAgent('generator');
-            
-            // Get current code from the code container
-            const code = codeContainer.textContent;
-            
-            fetch('/api/enhance-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ code, feedback })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success !== false) {
-                    // Update UI with enhanced code
-                    codeContainer.textContent = data.code;
-                    consoleOutput.textContent = data.output || '# No output yet';
-                    explanationContainer.textContent = data.explanation || '# No explanation yet';
-                    
-                    // Store the filename for download
-                    currentFilename = data.filename;
-                    
-                    // Clear feedback input
-                    feedbackInput.value = '';
-                    
-                    // Update status
-                    updateStatus('Code enhanced successfully', 'success');
-                } else {
-                    updateStatus('Error: ' + (data.error || 'Could not enhance code'), 'error');
-                }
-                
-                hideLoading();
-                resetAgents();
-            })
-            .catch(error => {
-                console.error('Error enhancing code:', error);
-                updateStatus('Error communicating with server', 'error');
-                hideLoading();
-                resetAgents();
-            });
-        }
-        
-        // Update status
-        function updateStatus(message, status) {
-            statusText.textContent = message;
-            
-            // Remove all status classes
-            statusIndicator.className = 'status-indicator';
-            
-            // Add the appropriate class
-            switch (status) {
-                case 'idle':
-                    statusIndicator.classList.add('status-idle');
-                    break;
-                case 'listening':
-                    statusIndicator.classList.add('status-listening');
-                    break;
-                case 'processing':
-                    statusIndicator.classList.add('status-processing');
-                    break;
-                case 'success':
-                    statusIndicator.classList.add('status-success');
-                    break;
-                case 'error':
-                    statusIndicator.classList.add('status-error');
-                    break;
-                default:
-                    statusIndicator.classList.add('status-idle');
-            }
-        }
-        
-        // Show loading overlay
-        function showLoading(text, detail) {
-            loadingText.textContent = text || 'Processing...';
-            loadingDetail.textContent = detail || 'Please wait';
-            loadingOverlay.style.display = 'flex';
-        }
-        
-        // Hide loading overlay
-        function hideLoading() {
-            loadingOverlay.style.display = 'none';
-        }
-        
-        // Activate agent icon
-        function activateAgent(agent) {
-            // Reset all agents
-            resetAgents();
-            
-            // Activate the specified agent
-            switch (agent) {
-                case 'generator':
-                    generatorIcon.classList.add('active-agent');
-                    break;
-                case 'debugger':
-                    debuggerIcon.classList.add('active-agent');
-                    break;
-                case 'executor':
-                    executorIcon.classList.add('active-agent');
-                    break;
-            }
-        }
-        
-        // Reset all agent icons
-        function resetAgents() {
-            generatorIcon.classList.remove('active-agent');
-            debuggerIcon.classList.remove('active-agent');
-            executorIcon.classList.remove('active-agent');
-        }
-        
-        // Initialize on page load
-        window.addEventListener('DOMContentLoaded', init);
-        
-        // Web Speech API fallback
-        // This is an alternative to the MediaRecorder API for speech recognition
-        function setupWebSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-        console.warn('Web Speech API not supported.');
-        updateStatus('Speech recognition not available in this browser', 'error');
+// Set up media recorder for speech recognition
+function setupMediaRecorder() {
+    console.log('[Audio] Setting up MediaRecorder');
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('[Audio] getUserMedia is not supported in this browser');
+        updateStatus('Browser does not support audio recording', 'error');
         return false;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            console.log('[Audio] Got media stream');
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.onstart = () => {
+                console.log('[Audio] Recording started');
+                audioChunks = [];
+                isRecording = true;
+                micBtn.classList.add('recording');
+                updateStatus('Listening...', 'listening');
+            };
+            
+            mediaRecorder.ondataavailable = (event) => {
+                console.log('[Audio] Data available');
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                console.log('[Audio] Recording stopped');
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                updateStatus('Processing audio...', 'processing');
+                
+                if (audioChunks.length > 0) {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    console.log('[Audio] Created blob of size', audioBlob.size);
+                    sendAudioToServer(audioBlob);
+                } else {
+                    console.error('[Audio] No audio data recorded');
+                    updateStatus('No audio data recorded', 'error');
+                }
+            };
+            
+            // Assign click handler for mic button
+            micBtn.addEventListener('click', toggleRecording);
+            
+            return true;
+        })
+        .catch(error => {
+            console.error('[Audio] Error accessing microphone:', error);
+            updateStatus('Microphone access denied', 'error');
+            return false;
+        });
+}
 
-    recognition.onstart = () => {
+// Start recording
+function startRecording() {
+    console.log('[Audio] Attempting to start recording');
+    
+    if (mediaRecorder) {
+        // Using MediaRecorder API
+        if (mediaRecorder.state === 'inactive') {
+            console.log('[Audio] Starting MediaRecorder');
+            mediaRecorder.start();
+        } else {
+            console.warn('[Audio] MediaRecorder already active:', mediaRecorder.state);
+        }
+    } else if (recognitionInstance) {
+        // Using Web Speech API
+        console.log('[Audio] Starting Web Speech recognition');
+        transcript.value = '';
+        recognitionInstance.start();
+    } else {
+        console.error('[Audio] No recording method available');
+        updateStatus('Speech recognition not available', 'error');
+    }
+}
+
+// Stop recording
+function stopRecording() {
+    console.log('[Audio] Attempting to stop recording');
+    
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        console.log('[Audio] Stopping MediaRecorder');
+        mediaRecorder.stop();
+    } else if (recognitionInstance) {
+        // Using Web Speech API
+        console.log('[Audio] Stopping Web Speech recognition');
+        recognitionInstance.stop();
+    } else {
+        console.warn('[Audio] No active recording to stop');
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        updateStatus('Ready', 'idle');
+    }
+}
+
+// Send audio to server for transcription
+function sendAudioToServer(audioBlob) {
+    console.log('[Audio] Sending audio to server, blob size:', audioBlob.size);
+    
+    const formData = new FormData();
+    formData.append('audio', audioBlob);
+    
+    fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('[Audio] Server response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('[Audio] Transcription result:', data);
+        
+        if (data.success && data.text) {
+            transcript.value = data.text;
+            processTextRequest(data.text);
+        } else {
+            updateStatus('Error: ' + (data.error || 'Could not transcribe audio'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[Audio] Error sending audio:', error);
+        updateStatus('Error communicating with server', 'error');
+    });
+}
+
+// Process text request
+function processTextRequest(text) {
+    console.log('[Process] Processing text request:', text);
+    
+    showLoading('Generating Code', 'The Generator Agent is creating your code...');
+    activateAgent('generator');
+    
+    // Send text to server
+    fetch('/api/process-text', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('[Process] Server response:', data);
+        
+        if (data.success !== false) {
+            // Update UI with generated code
+            codeContainer.textContent = data.code;
+            consoleOutput.textContent = data.output || '# No output yet';
+            explanationContainer.textContent = data.explanation || '# No explanation yet';
+            
+            // Store the filename for download
+            currentFilename = data.filename;
+            
+            // Enable action buttons
+            runBtn.classList.remove('disabled');
+            debugBtn.classList.remove('disabled');
+            explainBtn.classList.remove('disabled');
+            downloadBtn.classList.remove('disabled');
+            
+            // Update status
+            updateStatus('Code generated successfully', 'success');
+        } else {
+            updateStatus('Error: ' + (data.error || 'Could not generate code'), 'error');
+        }
+        
+        hideLoading();
+        resetAgents();
+    })
+    .catch(error => {
+        console.error('[Process] Error processing text:', error);
+        updateStatus('Error communicating with server', 'error');
+        hideLoading();
+        resetAgents();
+    });
+}
+
+// Web Speech API fallback
+function setupWebSpeechRecognition() {
+    console.log('[Speech] Setting up Web Speech API');
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn('[Speech] Web Speech API not supported');
+        updateStatus('Speech recognition not available in this browser', 'error');
+        return false;
+    }
+    
+    recognitionInstance = new SpeechRecognition();
+    recognitionInstance.continuous = false;
+    recognitionInstance.interimResults = true;
+    recognitionInstance.lang = 'en-US';
+    
+    recognitionInstance.onstart = () => {
+        console.log('[Speech] Recognition started');
         isRecording = true;
         micBtn.classList.add('recording');
         updateStatus('Listening...', 'listening');
-        console.log('[Speech] Started');
     };
-
-    recognition.onresult = (event) => {
+    
+    recognitionInstance.onresult = (event) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             finalTranscript += event.results[i][0].transcript;
         }
-
+        
+        console.log('[Speech] Interim transcript:', finalTranscript);
         transcript.value = finalTranscript.trim();
-        console.log('[Speech] Final Transcript:', finalTranscript);
     };
-
-    recognition.onend = () => {
+    
+    recognitionInstance.onend = () => {
+        console.log('[Speech] Recognition ended');
         isRecording = false;
         micBtn.classList.remove('recording');
-        console.log('[Speech] Ended');
-
+        
         if (transcript.value.trim()) {
+            console.log('[Speech] Final transcript:', transcript.value);
             updateStatus('Processing...', 'processing');
             processTextRequest(transcript.value.trim());
         } else {
+            console.warn('[Speech] No speech detected');
             updateStatus('No speech detected', 'error');
         }
     };
-
-    recognition.onerror = (event) => {
+    
+    recognitionInstance.onerror = (event) => {
+        console.error('[Speech] Recognition error:', event.error);
         isRecording = false;
         micBtn.classList.remove('recording');
-        console.error('[Speech] Error:', event.error);
         updateStatus('Error: ' + event.error, 'error');
     };
-
-    // Only wire up once to avoid double triggering
-    micBtn.onclick = () => {
-        if (isRecording) {
-            recognition.stop();
-        } else {
-            transcript.value = '';
-            recognition.start();
-        }
-    };
-
+    
+    // Assign click handler for mic button
+    micBtn.addEventListener('click', toggleRecording);
+    
     return true;
 }
+
+// Attempt to use MediaRecorder first, then fall back to Web Speech API if necessary
+function initSpeechRecognition() {
+    console.log('[Init] Initializing speech recognition');
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        setupMediaRecorder()
+            .then(success => {
+                if (!success) {
+                    console.log('[Init] MediaRecorder setup failed, trying Web Speech fallback');
+                    return setupWebSpeechRecognition();
+                } else {
+                    console.log('[Init] Using MediaRecorder API');
+                    return true;
+                }
+            })
+            .then(success => {
+                if (!success) {
+                    console.error('[Init] All speech recognition methods failed');
+                    micBtn.disabled = true;
+                    micBtn.style.backgroundColor = '#ccc';
+                    micBtn.style.cursor = 'not-allowed';
+                    updateStatus('Speech recognition not available', 'error');
+                } else {
+                    console.log('[Init] Speech recognition initialized successfully');
+                    updateStatus('Ready', 'idle');
+                }
+            });
+    } else {
+        console.log('[Init] MediaDevices API not available, trying Web Speech fallback');
+        const success = setupWebSpeechRecognition();
         
-        // Try Web Speech API if MediaRecorder fails
-        function fallbackToWebSpeech() {
-            const success = setupWebSpeechRecognition();
-            if (success) {
-                console.log('Using Web Speech API fallback');
-            } else {
-                console.error('Both MediaRecorder and Web Speech API are unavailable');
-                updateStatus('Speech recognition not available', 'error');
-            }
+        if (!success) {
+            console.error('[Init] All speech recognition methods failed');
+            micBtn.disabled = true;
+            micBtn.style.backgroundColor = '#ccc';
+            micBtn.style.cursor = 'not-allowed';
+            updateStatus('Speech recognition not available', 'error');
+        }
+    }
+}
+
+// Run code
+function runCode() {
+    if (!codeContainer.textContent.trim()) return;
+    
+    showLoading('Running Code', 'The Executor Agent is running your code...');
+    activateAgent('executor');
+    
+    // Get current code from the code container
+    const code = codeContainer.textContent;
+    
+    fetch('/api/execute-code', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Switch to output tab
+        document.getElementById('output-tab').click();
+        
+        if (data.success) {
+            consoleOutput.textContent = data.output || '# No output';
+            updateStatus('Code executed successfully', 'success');
+        } else {
+            consoleOutput.textContent = data.error || 'Error executing code';
+            updateStatus('Execution failed', 'error');
         }
         
-        // Attempt to use MediaRecorder first, but fall back to Web Speech API if there's an error
-        function initSpeechRecognition() {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(stream => {
-                        try {
-                            mediaRecorder = new MediaRecorder(stream);
-                            console.log('Using MediaRecorder API');
-                        } catch (e) {
-                            console.warn('MediaRecorder error:', e);
-                            fallbackToWebSpeech();
-                        }
-                    })
-                    .catch(error => {
-                        console.warn('MediaRecorder error:', error);
-                        fallbackToWebSpeech();
-                    });
-            } else {
-                fallbackToWebSpeech();
-            }
+        hideLoading();
+        resetAgents();
+    })
+    .catch(error => {
+        console.error('Error running code:', error);
+        consoleOutput.textContent = 'Error: ' + error.message;
+        updateStatus('Error communicating with server', 'error');
+        hideLoading();
+        resetAgents();
+    });
+}
+
+// Debug code
+function debugCode() {
+    if (!codeContainer.textContent.trim()) return;
+    
+    showLoading('Debugging Code', 'The Debugger Agent is fixing your code...');
+    activateAgent('debugger');
+    
+    // Get current code from the code container
+    const code = codeContainer.textContent;
+    const error = consoleOutput.textContent;
+    
+    fetch('/api/enhance-code', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            code,
+            feedback: 'Fix any bugs or errors in this code. ' + error
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success !== false) {
+            // Update UI with debugged code
+            codeContainer.textContent = data.code;
+            consoleOutput.textContent = data.output || '# No output yet';
+            explanationContainer.textContent = data.explanation || '# No explanation yet';
+            
+            // Store the filename for download
+            currentFilename = data.filename;
+            
+            // Update status
+            updateStatus('Code debugged successfully', 'success');
+        } else {
+            updateStatus('Error: ' + (data.error || 'Could not debug code'), 'error');
         }
         
-        // Call this function instead of just setupMediaRecorder
-        initSpeechRecognition();
-    </script> -->
-    <script src="/templates/script.js"></script>
+        hideLoading();
+        resetAgents();
+    })
+    .catch(error => {
+        console.error('Error debugging code:', error);
+        updateStatus('Error communicating with server', 'error');
+        hideLoading();
+        resetAgents();
+    });
+}
+
+// Explain code
+function explainCode() {
+    if (!codeContainer.textContent.trim()) return;
+    
+    showLoading('Explaining Code', 'Generating a detailed explanation...');
+    
+    // Get current code from the code container
+    const code = codeContainer.textContent;
+    
+    fetch('/api/explain-code', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Switch to explanation tab
+        document.getElementById('explanation-tab').click();
+        
+        if (data.success) {
+            explanationContainer.textContent = data.explanation;
+            updateStatus('Explanation generated', 'success');
+        } else {
+            explanationContainer.textContent = 'Error: ' + (data.error || 'Could not explain code');
+            updateStatus('Error generating explanation', 'error');
+        }
+        
+        hideLoading();
+    })
+    .catch(error => {
+        console.error('Error explaining code:', error);
+        explanationContainer.textContent = 'Error: ' + error.message;
+        updateStatus('Error communicating with server', 'error');
+        hideLoading();
+    });
+}
+
+// Download code
+function downloadCode() {
+    if (!currentFilename) return;
+    
+    window.location.href = '/download/' + currentFilename;
+}
+
+// Enhance code based on feedback
+function enhanceCode() {
+    const feedback = feedbackInput.value.trim();
+    if (!feedback || !codeContainer.textContent.trim()) return;
+    
+    showLoading('Enhancing Code', 'Implementing your requested changes...');
+    activateAgent('generator');
+    
+    // Get current code from the code container
+    const code = codeContainer.textContent;
+    
+    fetch('/api/enhance-code', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code, feedback })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success !== false) {
+            // Update UI with enhanced code
+            codeContainer.textContent = data.code;
+            consoleOutput.textContent = data.output || '# No output yet';
+            explanationContainer.textContent = data.explanation || '# No explanation yet';
+            
+            // Store the filename for download
+            currentFilename = data.filename;
+            
+            // Clear feedback input
+            feedbackInput.value = '';
+            
+            // Update status
+            updateStatus('Code enhanced successfully', 'success');
+        } else {
+            updateStatus('Error: ' + (data.error || 'Could not enhance code'), 'error');
+        }
+        
+        hideLoading();
+        resetAgents();
+    })
+    .catch(error => {
+        console.error('Error enhancing code:', error);
+        updateStatus('Error communicating with server', 'error');
+        hideLoading();
+        resetAgents();
+    });
+}
+
+// Update status
+function updateStatus(message, status) {
+    console.log('[Status]', status, message);
+    statusText.textContent = message;
+    
+    // Remove all status classes
+    statusIndicator.className = 'status-indicator';
+    
+    // Add the appropriate class
+    switch (status) {
+        case 'idle':
+            statusIndicator.classList.add('status-idle');
+            break;
+        case 'listening':
+            statusIndicator.classList.add('status-listening');
+            break;
+        case 'processing':
+            statusIndicator.classList.add('status-processing');
+            break;
+        case 'success':
+            statusIndicator.classList.add('status-success');
+            break;
+        case 'error':
+            statusIndicator.classList.add('status-error');
+            break;
+        default:
+            statusIndicator.classList.add('status-idle');
+    }
+}
+
+// Show loading overlay
+function showLoading(text, detail) {
+    loadingText.textContent = text || 'Processing...';
+    loadingDetail.textContent = detail || 'Please wait';
+    loadingOverlay.style.display = 'flex';
+}
+
+// Hide loading overlay
+function hideLoading() {
+    loadingOverlay.style.display = 'none';
+}
+
+// Activate agent icon
+function activateAgent(agent) {
+    // Reset all agents
+    resetAgents();
+    
+    // Activate the specified agent
+    switch (agent) {
+        case 'generator':
+            generatorIcon.classList.add('active-agent');
+            break;
+        case 'debugger':
+            debuggerIcon.classList.add('active-agent');
+            break;
+        case 'executor':
+            executorIcon.classList.add('active-agent');
+            break;
+    }
+}
+
+// Reset all agent icons
+function resetAgents() {
+    generatorIcon.classList.remove('active-agent');
+    debuggerIcon.classList.remove('active-agent');
+    executorIcon.classList.remove('active-agent');
+}
+
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>

@@ -2,6 +2,12 @@
 
 A web application that converts voice commands into functional code. Simply speak your requirements, and the application will generate and run the corresponding code in real-time.
 
+## Installation
+
+1. Clone the repo
+2. Add a `.env` file with an `OPENAI_API_KEY`
+3. Run either `python speech-to-code.py --web` or `python speech-to-code.py --cli`
+
 ## Features
 
 - Voice command recognition
@@ -26,6 +32,7 @@ The application currently supports the following voice commands:
 - Modern web browser (Chrome or Edge recommended)
 - Microphone access
 - Internet connection
+- OpenAI API key
 
 ## How to Use
 
@@ -39,11 +46,16 @@ The application currently supports the following voice commands:
 
 ## Technical Details
 
-- Built with vanilla JavaScript
-- Uses Web Speech API for voice recognition
-- Responsive design using CSS Grid
-- Real-time code execution in sandboxed iframe
-- Error handling and status updates
+- Built with Python and Flask backend
+- Uses OpenAI's API for code generation and enhancement
+- Speech recognition (via browser or speech_recognition library)
+- Multiple AI agent system:
+  - Code Generator Agent - Creates initial code
+  - Code Debugger Agent - Finds and fixes errors
+  - Code Executor Agent - Runs and tests the code
+  - Code Explainer Agent - Provides explanations
+  - Code Enhancer Agent - Improves code based on feedback
+- Responsive web interface
 
 ## Browser Support
 
@@ -57,6 +69,7 @@ The application works best in modern browsers that support the Web Speech API:
 - Requires browser support for Web Speech API
 - Limited to predefined application types
 - Voice recognition accuracy depends on microphone quality and environment
+- Requires OpenAI API key
 
 ## Future Improvements
 
@@ -69,7 +82,3 @@ The application works best in modern browsers that support the Web Speech API:
 ## Contributing
 
 Feel free to fork the repository and submit pull requests for any improvements.
-
-## License
-
-This project is open source and available under the MIT License. 

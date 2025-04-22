@@ -1,10 +1,8 @@
 # Speech-to-Code Application
 
-A web appl
-
 https://github.com/user-attachments/assets/1579525e-0c72-4dd9-81e0-3af179d327a1
 
-ication that converts voice commands into functional code. Simply speak your requirements, and the application will generate and run the corresponding code in real-time.
+A web application that converts voice commands into functional code. Simply speak your requirements, and the application will generate and run the corresponding code in real-time.
 
 ## Installation
 
